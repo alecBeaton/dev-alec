@@ -1,0 +1,12 @@
+.cproject
+.project
+.settings/
+debug/
+release/
+*.d
+*.o
+*.axf
+*.bin
+*.lst
+*.map
+*.swp
