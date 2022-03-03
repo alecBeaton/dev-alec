@@ -163,7 +163,7 @@ void button_handler(void)
 
   if(xQueueSendFromISR(ApplicationTaskQueue, &msg, &hp_task_woke) != pdFAIL)
   {
-    //portYIELD_FROM_ISR(hp_task_woke);
+    portYIELD_FROM_ISR(hp_task_woke);
   }
 }
 
