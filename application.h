@@ -51,6 +51,7 @@ typedef enum
     JOIN = 0,
     RESET,
     SEND,
+    BUTTON,
     SYNC_APP,
     SYNC_MAC,
     WAKE

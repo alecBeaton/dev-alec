@@ -135,33 +135,36 @@ void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
     }
 }
 
-void
-button_handler(uint32_t buttonId)
-{
-    am_devices_led_toggle(am_bsp_psLEDs, 0);
-}
+#define BUTTON_DEBOUNCE_MS            (20)
+#define BUTTON_DEBOUNCE_READ_DELAY_MS (2)
 
-void
-button0_handler(void)
+/******************************************************************************
+ * button_handler
+ ******************************************************************************/
+void button_handler(void)
 {
-    uint32_t count;
+  BaseType_t hp_task_woke = pdFALSE;
+  task_message_t msg =
+  {
+    .ui32Event = BUTTON
+  };
+
+  for(uint32_t i = 0; i < (BUTTON_DEBOUNCE_MS/BUTTON_DEBOUNCE_READ_DELAY_MS); i++)
+  {
     uint32_t val;
 
-    //
-    // Debounce for 20 ms.
-    // We're triggered for rising edge - so we expect a consistent HIGH here
-    //
-    for (count = 0; count < 10; count++)
+    am_hal_gpio_state_read(AM_BSP_GPIO_BUTTON0, AM_HAL_GPIO_INPUT_READ, &val);
+    if(!val)
     {
-        am_hal_gpio_state_read(AM_BSP_GPIO_BUTTON0,  AM_HAL_GPIO_INPUT_READ, &val);
-        if (!val)
-        {
-            return; // State not high...must be result of debounce
-        }
-        am_util_delay_ms(2);
+      return;
     }
+    am_util_delay_ms(BUTTON_DEBOUNCE_READ_DELAY_MS);
+  }
 
-    button_handler(0);
+  if(xQueueSendFromISR(ApplicationTaskQueue, &msg, &hp_task_woke) != pdFAIL)
+  {
+    //portYIELD_FROM_ISR(hp_task_woke);
+  }
 }
 
 void system_setup(void)
@@ -193,25 +196,26 @@ void system_setup(void)
     am_devices_led_array_out(am_bsp_psLEDs, AM_BSP_NUM_LEDS, 0x0);
     am_devices_button_array_init(am_bsp_psButtons, AM_BSP_NUM_BUTTONS);
 
-    am_hal_gpio_pinconfig(AM_BSP_GPIO_LED0, g_AM_HAL_GPIO_OUTPUT);
-    am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_SET);
-
-    am_devices_led_array_init(am_bsp_psLEDs, AM_BSP_NUM_LEDS);
-    am_devices_led_off(am_bsp_psLEDs, 0);
-
-    NVIC_SetPriority(GPIO_IRQn, NVIC_configMAX_SYSCALL_INTERRUPT_PRIORITY);
     //
     // Register interrupt handler for button presses
     //
-    am_hal_gpio_interrupt_register(AM_BSP_GPIO_BUTTON0, button0_handler);
-
+    am_hal_gpio_interrupt_register(AM_BSP_GPIO_BUTTON0, button_handler);
     am_hal_gpio_pinconfig(AM_BSP_GPIO_BUTTON0, g_AM_BSP_GPIO_BUTTON0);
 
+    //
+    // Clear the GPIO Interrupt (write to clear).
+    //
     AM_HAL_GPIO_MASKCREATE(GpioIntMask0);
     am_hal_gpio_interrupt_clear(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, AM_BSP_GPIO_BUTTON0));
 
+    //
+    // Enable the GPIO/button interrupt.
+    //
     am_hal_gpio_interrupt_enable(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, AM_BSP_GPIO_BUTTON0));
     NVIC_EnableIRQ(GPIO_IRQn);
+
+    am_hal_gpio_pinconfig(AM_BSP_GPIO_LED0, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_SET);
 
     am_hal_interrupt_master_enable();
 }

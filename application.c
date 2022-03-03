@@ -462,6 +462,9 @@ void application_handle_command()
         case SYNC_MAC:
             LmHandlerDeviceTimeReq();
             break;
+        case BUTTON:
+            am_devices_led_toggle(am_bsp_psLEDs, 0);
+            break;
         case WAKE:
             break;
         }
@@ -647,8 +650,6 @@ void application_task(void *pvParameters)
 
     application_setup();
     application_timer_setup();
-
-    am_util_stdio_printf("Test");
 
     TransmitPending = false;
     timeout = portMAX_DELAY;
