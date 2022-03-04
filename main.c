@@ -146,7 +146,7 @@ void button_handler(void)
   BaseType_t hp_task_woke = pdFALSE;
   task_message_t msg =
   {
-    .ui32Event = BUTTON
+    .ui32Event = SEND
   };
 
   for(uint32_t i = 0; i < (BUTTON_DEBOUNCE_MS/BUTTON_DEBOUNCE_READ_DELAY_MS); i++)
@@ -212,6 +212,7 @@ void system_setup(void)
     // Enable the GPIO/button interrupt.
     //
     am_hal_gpio_interrupt_enable(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, AM_BSP_GPIO_BUTTON0));
+    NVIC_SetPriority(GPIO_IRQn, 255);
     NVIC_EnableIRQ(GPIO_IRQn);
 
     am_hal_gpio_pinconfig(AM_BSP_GPIO_LED0, g_AM_HAL_GPIO_OUTPUT);
