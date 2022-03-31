@@ -55,6 +55,7 @@
 #include <utilities.h>
 
 #include "ota_config.h"
+#include "timers.h"
 
 #include "application.h"
 #include "application_cli.h"
@@ -99,6 +100,11 @@ static uint8_t FragmentNumber;
 static uint8_t FragmentReceived;
 static uint8_t PrepareFlashStorage;
 static LmHandlerAppData_t fragComplete;
+
+TimerHandle_t robotTimer;
+TimerHandle_t leftTimer;
+TimerHandle_t rightTimer;
+TimerHandle_t turnTimer;
 
 /*
  * Board ID is called by the LoRaWAN stack to
@@ -438,6 +444,105 @@ void application_handle_uplink()
     }
 }
 
+void setStep1(int p1, int p2, int p3, int p4)
+{
+    am_hal_gpio_state_write(45, p1);
+    am_hal_gpio_state_write(46, p2);
+    am_hal_gpio_state_write(17, p3);
+    am_hal_gpio_state_write(48, p4);
+}
+
+void setStep2(int p1, int p2, int p3, int p4)
+{
+    am_hal_gpio_state_write(5, p1);
+    am_hal_gpio_state_write(6, p2);
+    am_hal_gpio_state_write(7, p3);
+    am_hal_gpio_state_write(20, p4);
+}
+
+void turnCallBack(TimerHandle_t xTimer)
+{
+    uint32_t count;
+    count = (uint32_t)pvTimerGetTimerID(xTimer);
+
+    if(count < 1000)
+    {
+        am_util_stdio_printf("Backwards ");
+        if(!(count%4))
+        {
+            setStep1(1, 1, 0, 0);
+            setStep2(1, 0, 0, 1);
+        }
+        else if(!((count-1)%4))
+        {
+            setStep1(0, 1, 1, 0);
+            setStep2(0, 0, 1, 1);
+        }
+        else if(!((count-2)%4))
+        {
+            setStep1(0, 0, 1, 1);
+            setStep2(0, 1, 1, 0);
+        }
+        else if(!((count-3)%4))
+        {
+            setStep1(1, 0, 0, 1);
+            setStep2(1, 1, 0, 0);
+        }
+    }
+
+    else if(count < 2500)
+    {
+        am_util_stdio_printf("Turning ");
+        if(!(count%4))
+        {
+            setStep1(1, 0, 0, 1);
+            setStep2(1, 0, 0, 1);
+        }
+        else if(!((count-1)%4))
+        {
+            setStep1(0, 0, 1, 1);
+            setStep2(0, 0, 1, 1);
+        }
+        else if(!((count-2)%4))
+        {
+            setStep1(0, 1, 1, 0);
+            setStep2(0, 1, 1, 0);
+        }
+        else if(!((count-3)%4))
+        {
+            setStep1(1, 1, 0, 0);
+            setStep2(1, 1, 0, 0);
+        }
+    }
+
+    else
+    {
+        am_util_stdio_printf("Finished ");
+        xTimerStop(xTimer, 0);
+        xTimerStart(robotTimer, 0);
+    }
+
+    count++;
+   
+    vTimerSetTimerID(xTimer, (void *) count);
+
+}
+
+void turnRobot()
+{
+    xTimerStop(robotTimer, 0);
+    xTimerStop(leftTimer, 0);
+    xTimerStop(rightTimer, 0);
+
+    turnTimer = xTimerCreate("turnTimer", 2, pdTRUE, (void *) 0, turnCallBack);
+
+    xTimerStart(turnTimer, 0);
+
+    while((uint32_t)pvTimerGetTimerID(turnTimer) < 2501)
+    {
+    }
+}
+
 void application_handle_command()
 {
     task_message_t TaskMessage;
@@ -461,6 +566,9 @@ void application_handle_command()
             break;
         case SYNC_MAC:
             LmHandlerDeviceTimeReq();
+            break;
+        case TURN:
+            turnRobot();
             break;
         case BUTTON:
             am_devices_led_toggle(am_bsp_psLEDs, 0);
@@ -638,8 +746,137 @@ dump_ota_status(void)
     }
 }
 
+void vTimerCallForward(TimerHandle_t xTimer)
+{
+    uint32_t count;
+    count = (uint32_t)pvTimerGetTimerID(xTimer);
+
+    if(!(count%4))
+    {
+        setStep1(1, 0, 0, 1);
+        setStep2(1, 1, 0, 0);
+        am_util_stdio_printf("1");
+    }
+    else if(!((count-1)%4))
+    {
+        setStep1(0, 0, 1, 1);
+        setStep2(0, 1, 1, 0);
+        am_util_stdio_printf("2");
+    }
+    else if(!((count-2)%4))
+    {
+        setStep1(0, 1, 1, 0);
+        setStep2(0, 0, 1, 1);
+        am_util_stdio_printf("3");
+    }
+    else if(!((count-3)%4))
+    {
+        setStep1(1, 1, 0, 0);
+        setStep2(1, 0, 0, 1);
+        am_util_stdio_printf("4");
+    }
+
+    count++;
+
+    vTimerSetTimerID(xTimer, (void *) count);
+
+}
+
+void leftCallBack(TimerHandle_t xTimer)
+{
+    uint32_t count;
+    count = (uint32_t)pvTimerGetTimerID(xTimer);
+
+    am_util_stdio_printf("left ");
+
+    if(!(count%4))
+    {
+        setStep1(1, 1, 0, 0);
+        setStep2(1, 1, 0, 0);
+    }
+    else if(!((count-1)%4))
+    {
+        setStep1(0, 1, 1, 0);
+        setStep2(0, 1, 1, 0);
+    }
+    else if(!((count-2)%4))
+    {
+        setStep1(0, 0, 1, 1);
+        setStep2(0, 0, 1, 1);
+    }
+    else if(!((count-3)%4))
+    {
+        setStep1(1, 0, 0, 1);
+        setStep2(1, 0, 0, 1);
+    }
+
+    count++;
+
+    vTimerSetTimerID(xTimer, (void *) count);
+
+}
+
+void rightCallBack(TimerHandle_t xTimer)
+{
+    uint32_t count;
+    count = (uint32_t)pvTimerGetTimerID(xTimer);
+
+    am_util_stdio_printf("right ");
+
+    if(!(count%4))
+    {
+        setStep1(1, 0, 0, 1);
+        setStep2(1, 0, 0, 1);
+    }
+    else if(!((count-1)%4))
+    {
+        setStep1(0, 0, 1, 1);
+        setStep2(0, 0, 1, 1);
+    }
+    else if(!((count-2)%4))
+    {
+        setStep1(0, 1, 1, 0);
+        setStep2(0, 1, 1, 0);
+    }
+    else if(!((count-3)%4))
+    {
+        setStep1(1, 1, 0, 0);
+        setStep2(1, 1, 0, 0);
+    }
+
+    count++;
+
+    vTimerSetTimerID(xTimer, (void *) count);
+
+}
+
+#define BUTTON_DEBOUNCE_MS            (100)
+#define BUTTON_DEBOUNCE_READ_DELAY_MS (2)
+
+bool debounce(int pinNum)
+{
+    for(uint32_t i = 0; i < (BUTTON_DEBOUNCE_MS/BUTTON_DEBOUNCE_READ_DELAY_MS); i++)
+  {
+    uint32_t val;
+
+    am_hal_gpio_state_read(pinNum, AM_HAL_GPIO_INPUT_READ, &val);
+    if(!val)
+    {
+      return false;
+    }
+    am_util_delay_ms(BUTTON_DEBOUNCE_READ_DELAY_MS);
+  }
+    return true;
+}
+
 void application_task(void *pvParameters)
 {
+    robotTimer = xTimerCreate("robotTimer", 2, pdTRUE, (void *) 0, vTimerCallForward);
+    leftTimer = xTimerCreate("leftTimer", 2, pdTRUE, (void *) 0, leftCallBack);
+    rightTimer = xTimerCreate("rightTimer", 2, pdTRUE, (void *) 0, rightCallBack);
+
+    xTimerStart(robotTimer, 0);
+
     FreeRTOS_CLIRegisterCommand(&ApplicationCommandDefinition);
     ApplicationTaskQueue = xQueueCreate(10, sizeof(task_message_t));
 
@@ -653,10 +890,55 @@ void application_task(void *pvParameters)
 
     TransmitPending = false;
     timeout = portMAX_DELAY;
+
+    uint32_t leftState;
+    uint32_t rightState;
+
     while (1)
     {
         LmHandlerProcess();
         application_handle_uplink();
+
+        am_hal_gpio_state_read(29, AM_HAL_GPIO_INPUT_READ, &leftState);
+        am_hal_gpio_state_read(13, AM_HAL_GPIO_INPUT_READ, &rightState);
+        
+        if(leftState)
+        {
+            if(debounce(29))
+            {
+                xTimerStop(robotTimer, 0);
+
+                xTimerStart(leftTimer, 0);
+
+                while(leftState)
+                {
+                    am_hal_gpio_state_read(29, AM_HAL_GPIO_INPUT_READ, &leftState);
+                }
+                xTimerStop(leftTimer, 0);
+
+                xTimerStart(robotTimer, 0);
+            }
+        }
+        else if(rightState)
+        {
+            if(debounce(13))
+            {
+                xTimerStop(robotTimer, 0);
+
+                xTimerStart(rightTimer, 0);
+
+                while(rightState)
+                {
+                    am_hal_gpio_state_read(13, AM_HAL_GPIO_INPUT_READ, &rightState);
+                }
+                xTimerStop(rightTimer, 0);
+
+                xTimerStart(robotTimer, 0);
+            }
+        }
+        else
+        {
+        }
 
         if (MacProcessing)
         {

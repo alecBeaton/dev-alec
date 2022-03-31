@@ -52,6 +52,7 @@ typedef enum
     RESET,
     SEND,
     BUTTON,
+    TURN,
     SYNC_APP,
     SYNC_MAC,
     WAKE

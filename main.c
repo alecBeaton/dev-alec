@@ -135,7 +135,7 @@ void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
     }
 }
 
-#define BUTTON_DEBOUNCE_MS            (20)
+#define BUTTON_DEBOUNCE_MS            (200)
 #define BUTTON_DEBOUNCE_READ_DELAY_MS (2)
 
 /******************************************************************************
@@ -146,20 +146,22 @@ void button_handler(void)
   BaseType_t hp_task_woke = pdFALSE;
   task_message_t msg =
   {
-    .ui32Event = SEND
+    .ui32Event = TURN
   };
 
   for(uint32_t i = 0; i < (BUTTON_DEBOUNCE_MS/BUTTON_DEBOUNCE_READ_DELAY_MS); i++)
   {
     uint32_t val;
 
-    am_hal_gpio_state_read(AM_BSP_GPIO_BUTTON0, AM_HAL_GPIO_INPUT_READ, &val);
+    am_hal_gpio_state_read(11, AM_HAL_GPIO_INPUT_READ, &val);
     if(!val)
     {
       return;
     }
     am_util_delay_ms(BUTTON_DEBOUNCE_READ_DELAY_MS);
   }
+
+    am_util_stdio_printf("interrupted ");
 
   if(xQueueSendFromISR(ApplicationTaskQueue, &msg, &hp_task_woke) != pdFAIL)
   {
@@ -199,24 +201,35 @@ void system_setup(void)
     //
     // Register interrupt handler for button presses
     //
-    am_hal_gpio_interrupt_register(AM_BSP_GPIO_BUTTON0, button_handler);
-    am_hal_gpio_pinconfig(AM_BSP_GPIO_BUTTON0, g_AM_BSP_GPIO_BUTTON0);
+    am_hal_gpio_interrupt_register(11, button_handler);
+    am_hal_gpio_pinconfig(11, g_AM_HAL_GPIO_INPUT);
 
     //
     // Clear the GPIO Interrupt (write to clear).
     //
     AM_HAL_GPIO_MASKCREATE(GpioIntMask0);
-    am_hal_gpio_interrupt_clear(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, AM_BSP_GPIO_BUTTON0));
+    am_hal_gpio_interrupt_clear(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, 11));
 
     //
     // Enable the GPIO/button interrupt.
     //
-    am_hal_gpio_interrupt_enable(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, AM_BSP_GPIO_BUTTON0));
+    am_hal_gpio_interrupt_enable(AM_HAL_GPIO_MASKBIT(pGpioIntMask0, 11));
     NVIC_SetPriority(GPIO_IRQn, 255);
     NVIC_EnableIRQ(GPIO_IRQn);
 
     am_hal_gpio_pinconfig(AM_BSP_GPIO_LED0, g_AM_HAL_GPIO_OUTPUT);
     am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_SET);
+
+    am_hal_gpio_pinconfig(5, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(6, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(7, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(20, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(45, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(46, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(17, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(48, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(13, g_AM_HAL_GPIO_INPUT);
+    am_hal_gpio_pinconfig(29, g_AM_HAL_GPIO_INPUT);
 
     am_hal_interrupt_master_enable();
 }
